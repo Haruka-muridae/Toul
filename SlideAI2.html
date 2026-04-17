@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Slide Generator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=DM+Mono:wght@300;400&family=Noto+Serif+JP:wght@300;400&display=swap');
+
+  :root {
+    --bg: #0e0e0e;
+    --surface: #161616;
+    --border: #2a2a2a;
+    --accent: #c8f05a;
+    --text: #e8e4dc;
+    --muted: #666;
+    --error: #ff6b6b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 999;
+    opacity: 0.5;
+  }
+
+  header {
+    padding: 48px 60px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 24px;
+  }
+
+  .logo { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 300; letter-spacing: 0.08em; }
+  .logo span { color: var(--accent); }
+  .tagline { font-size: 10px; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; }
+
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 48px 60px;
+    gap: 48px;
+  }
+
+  .panel-label { font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
+  .input-panel { display: flex; flex-direction: column; gap: 24px; }
+
+  .mode-tabs { display: flex; border: 1px solid var(--border); }
+  .mode-tab {
+    flex: 1; padding: 10px 0;
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    background: transparent; border: none; color: var(--muted);
+    cursor: pointer; transition: background 0.2s, color 0.2s;
+  }
+  .mode-tab.active { background: var(--surface); color: var(--accent); }
+  .mode-tab:not(:last-child) { border-right: 1px solid var(--border); }
+
+  .input-section { display: none; }
+  .input-section.active { display: block; }
+
+  textarea {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-family: 'Noto Serif JP', serif;
+    font-size: 13px; line-height: 1.8; padding: 20px;
+    outline: none; resize: none; height: 240px; transition: border-color 0.2s;
+  }
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: var(--muted); font-family: 'DM Mono', monospace; font-size: 11px; line-height: 1.6; }
+  .char-count { font-size: 9px; color: var(--muted); text-align: right; margin-top: 6px; }
+
+  .docs-input-wrap { display: flex; flex-direction: column; gap: 12px; }
+
+  .field label { display: block; font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .field input, .field select {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-family: 'DM Mono', monospace; font-size: 11px;
+    padding: 10px 14px; outline: none; transition: border-color 0.2s; appearance: none;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field input::placeholder { color: var(--muted); }
+
+  .fetch-btn {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase;
+    padding: 10px 20px; cursor: pointer; transition: border-color 0.2s, color 0.2s;
+    align-self: flex-start;
+  }
+  .fetch-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .fetch-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .fetched-preview {
+    background: var(--surface); border: 1px solid var(--border);
+    border-left: 2px solid var(--accent);
+    padding: 14px 16px; font-family: 'Noto Serif JP', serif;
+    font-size: 11px; line-height: 1.7; color: #aaa;
+    max-height: 100px; overflow-y: auto; display: none;
+  }
+  .fetched-preview.show { display: block; }
+
+  .config-row { display: flex; gap: 16px; }
+  .config-row .field { flex: 1; }
+
+  .gas-field input { font-size: 10px; }
+
+  .generate-btn {
+    background: var(--accent); color: #0e0e0e; border: none;
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    padding: 16px 32px; cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .generate-btn:hover { opacity: 0.85; }
+  .generate-btn:active { transform: scale(0.99); }
+  .generate-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .error-box { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.3); padding: 14px 18px; display: none; }
+  .error-box.show { display: block; }
+  .error-box p { font-size: 11px; color: var(--error); line-height: 1.6; }
+
+  .output-panel { display: flex; flex-direction: column; }
+
+  .preview-area {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    min-height: 460px; position: relative; overflow: hidden;
+  }
+
+  .preview-empty {
+    position: absolute; inset: 0; display: flex;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; color: var(--muted);
+  }
+  .preview-empty .icon { font-size: 40px; opacity: 0.3; }
+  .preview-empty p { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; }
+
+  .slides-preview {
+    padding: 24px; display: flex; flex-direction: column;
+    gap: 12px; height: 100%; overflow-y: auto;
+  }
+  .slides-preview::-webkit-scrollbar { width: 4px; }
+  .slides-preview::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .slide-card {
+    background: #1e1e1e; border: 1px solid var(--border);
+    padding: 16px 20px; display: flex; gap: 16px; align-items: flex-start;
+    animation: slideIn 0.3s ease forwards; opacity: 0; transform: translateY(8px);
+  }
+  @keyframes slideIn { to { opacity: 1; transform: translateY(0); } }
+
+  .slide-num { font-size: 9px; color: var(--accent); letter-spacing: 0.1em; min-width: 24px; padding-top: 2px; }
+  .slide-content { flex: 1; }
+  .slide-title { font-family: 'Cormorant Garamond', serif; font-size: 15px; margin-bottom: 6px; }
+  .slide-bullets { list-style: none; display: flex; flex-direction: column; gap: 3px; }
+  .slide-bullets li { font-size: 10px; color: #999; padding-left: 12px; position: relative; }
+  .slide-bullets li::before { content: '—'; position: absolute; left: 0; color: var(--border); }
+
+  .status-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0; border-top: 1px solid var(--border);
+    margin-top: 16px; min-height: 48px;
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+  .status-dot.active { background: var(--accent); animation: pulse 1s infinite; }
+  .status-dot.error { background: var(--error); }
+  .status-dot.done { background: var(--accent); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .status-text { font-size: 10px; color: var(--muted); letter-spacing: 0.1em; flex: 1; }
+
+  .open-btn {
+    background: transparent; border: 1px solid var(--accent); color: var(--accent);
+    font-family: 'DM Mono', monospace; font-size: 9px;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    padding: 8px 16px; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: background 0.2s, color 0.2s;
+  }
+  .open-btn:hover { background: var(--accent); color: #0e0e0e; }
+
+  .loading-overlay {
+    position: absolute; inset: 0; background: rgba(14,14,14,0.85);
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center; gap: 20px;
+  }
+  .loading-overlay.show { display: flex; }
+
+  .spinner { width: 32px; height: 32px; border: 1px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-step { font-size: 10px; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; }
+  .progress-bar-wrap { width: 160px; height: 1px; background: var(--border); }
+  .progress-bar { height: 100%; background: var(--accent); width: 0%; transition: width 0.5s ease; }
+
+  @media (max-width: 768px) {
+    main { grid-template-columns: 1fr; padding: 24px; gap: 32px; }
+    header { padding: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Slide<span>Gen</span></div>
+  <div class="tagline">テキスト / Google Docs → スライド 自動生成</div>
+</header>
+
+<main>
+  <div class="input-panel">
+    <div>
+      <div class="panel-label">// 入力モード</div>
+      <div class="mode-tabs">
+        <button class="mode-tab active" onclick="switchMode('text')">テキスト入力</button>
+        <button class="mode-tab" onclick="switchMode('docs')">Google Docs</button>
+      </div>
+    </div>
+
+    <!-- テキスト入力 -->
+    <div class="input-section active" id="textSection">
+      <textarea id="inputText" placeholder="まとめたい資料・メモ・文章をここに貼り付けてください。
+
+例：
+・プロジェクトの背景と目的
+・現状の課題と提案内容
+・スケジュールと期待される効果"></textarea>
+      <div class="char-count"><span id="charCount">0</span> 文字</div>
+    </div>
+
+    <!-- Docs URL入力 -->
+    <div class="input-section" id="docsSection">
+      <div class="docs-input-wrap">
+        <div class="field">
+          <label>Google Docs URL または Doc ID</label>
+          <input type="text" id="docsUrl" placeholder="https://docs.google.com/document/d/XXXX/edit">
+        </div>
+        <button class="fetch-btn" id="fetchBtn" onclick="fetchDocText()">↓ テキストを取得する</button>
+        <div class="fetched-preview" id="fetchedPreview"></div>
+      </div>
+    </div>
+
+    <div class="config-row">
+      <div class="field">
+        <label>スライド枚数</label>
+        <select id="slideCount">
+          <option value="5">5枚</option>
+          <option value="8" selected>8枚</option>
+          <option value="10">10枚</option>
+          <option value="12">12枚</option>
+          <option value="15">15枚</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>スタイル</label>
+        <select id="slideStyle">
+          <option value="ビジネス提案">ビジネス提案</option>
+          <option value="報告・まとめ" selected>報告・まとめ</option>
+          <option value="教育・解説">教育・解説</option>
+          <option value="企画書">企画書</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field gas-field">
+      <label>GAS デプロイ URL</label>
+      <input type="text" id="gasUrl" placeholder="https://script.google.com/macros/s/AKfy.../exec">
+    </div>
+
+    <div id="errorBox" class="error-box"><p id="errorMsg"></p></div>
+
+    <button class="generate-btn" id="generateBtn" onclick="generate()">
+      <span>▶</span>
+      <span>スライドを生成する</span>
+    </button>
+  </div>
+
+  <div class="output-panel">
+    <div class="panel-label">// プレビュー</div>
+    <div class="preview-area" id="previewArea">
+      <div class="preview-empty" id="emptyState">
+        <div class="icon">⬡</div>
+        <p>生成後にプレビューが表示されます</p>
+      </div>
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+        <div class="loading-step" id="loadingStep">処理中...</div>
+      </div>
+      <div class="slides-preview" id="slidesPreview" style="display:none"></div>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-dot" id="statusDot"></div>
+      <div class="status-text" id="statusText">待機中</div>
+      <a class="open-btn" id="openBtn" style="display:none" target="_blank">↗ Googleスライドを開く</a>
+    </div>
+  </div>
+</main>
+
+<script>
+// ※ Claude APIキーはGASのScript Propertiesに保存。このファイルにキーは不要。
+
+let currentMode = 'text';
+let fetchedDocText = '';
+
+function switchMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-tab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0 && mode === 'text') || (i === 1 && mode === 'docs'));
+  });
+  document.getElementById('textSection').classList.toggle('active', mode === 'text');
+  document.getElementById('docsSection').classList.toggle('active', mode === 'docs');
+  clearError();
+}
+
+document.getElementById('inputText').addEventListener('input', function() {
+  document.getElementById('charCount').textContent = this.value.length;
+});
+
+function setStatus(type, text) {
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot' + (type ? ' ' + type : '');
+  document.getElementById('statusText').textContent = text;
+}
+
+function setLoading(show, step = '', progress = 0) {
+  document.getElementById('loadingOverlay').classList.toggle('show', show);
+  document.getElementById('loadingStep').textContent = step;
+  document.getElementById('progressBar').style.width = progress + '%';
+}
+
+function showError(msg) {
+  document.getElementById('errorMsg').textContent = msg;
+  document.getElementById('errorBox').classList.add('show');
+}
+
+function clearError() {
+  document.getElementById('errorBox').classList.remove('show');
+}
+
+// Docs テキスト取得（GAS経由）
+async function fetchDocText() {
+  const gasUrl = document.getElementById('gasUrl').value.trim();
+  const docsUrl = document.getElementById('docsUrl').value.trim();
+  if (!gasUrl) { showError('先にGAS デプロイ URLを入力してください。'); return; }
+  if (!docsUrl) { showError('Google Docs のURLを入力してください。'); return; }
+
+  clearError();
+  const btn = document.getElementById('fetchBtn');
+  btn.disabled = true;
+  btn.textContent = '取得中...';
+
+  try {
+    const res = await fetch(gasUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'getDoc', docId: docsUrl })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    fetchedDocText = data.text;
+    const preview = document.getElementById('fetchedPreview');
+    preview.textContent = fetchedDocText.slice(0, 200) + (fetchedDocText.length > 200 ? '…' : '');
+    preview.classList.add('show');
+    btn.textContent = `✓ 取得完了（${fetchedDocText.length}文字）`;
+  } catch (err) {
+    showError('Docs取得エラー: ' + err.message);
+    btn.textContent = '↓ テキストを取得する';
+    btn.disabled = false;
+  }
+}
+
+function renderPreview(slides) {
+  const container = document.getElementById('slidesPreview');
+  container.innerHTML = '';
+  container.style.display = 'flex';
+  document.getElementById('emptyState').style.display = 'none';
+
+  slides.forEach((slide, i) => {
+    const card = document.createElement('div');
+    card.className = 'slide-card';
+    card.style.animationDelay = (i * 60) + 'ms';
+    card.innerHTML = `
+      <div class="slide-num">${String(i + 1).padStart(2, '0')}</div>
+      <div class="slide-content">
+        <div class="slide-title">${esc(slide.title)}</div>
+        <ul class="slide-bullets">
+          ${(slide.bullets || []).map(b => `<li>${esc(b)}</li>`).join('')}
+        </ul>
+      </div>`;
+    container.appendChild(card);
+  });
+}
+
+function esc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// スライド生成（GASに全処理を委譲）
+async function generate() {
+  clearError();
+  const gasUrl = document.getElementById('gasUrl').value.trim();
+  const slideCount = document.getElementById('slideCount').value;
+  const slideStyle = document.getElementById('slideStyle').value;
+
+  let text = '';
+  if (currentMode === 'text') {
+    text = document.getElementById('inputText').value.trim();
+    if (!text) { showError('テキストを入力してください。'); return; }
+  } else {
+    if (!fetchedDocText) { showError('先に「テキストを取得する」を押してください。'); return; }
+    text = fetchedDocText;
+  }
+  if (!gasUrl) { showError('GAS デプロイ URL を入力してください。'); return; }
+
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true;
+  document.getElementById('openBtn').style.display = 'none';
+  document.getElementById('slidesPreview').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+
+  setStatus('active', 'GAS + Claude でスライドを生成中...');
+  setLoading(true, 'Claude がスライド構成を分析中...', 20);
+
+  // プログレスバーアニメーション（GASは時間がかかるため）
+  let progress = 20;
+  const ticker = setInterval(() => {
+    progress = Math.min(progress + 3, 85);
+    document.getElementById('progressBar').style.width = progress + '%';
+    if (progress > 50) document.getElementById('loadingStep').textContent = 'Google Slides を生成中...';
+  }, 1500);
+
+  try {
+    const res = await fetch(gasUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'generate', text, slideCount, slideStyle })
+    });
+
+    clearInterval(ticker);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    if (!data.url) throw new Error('GASからURLが返却されませんでした。');
+
+    setLoading(true, '完了', 100);
+    await new Promise(r => setTimeout(r, 400));
+    setLoading(false);
+
+    if (data.slides) renderPreview(data.slides);
+    setStatus('done', `完了 — ${(data.slides || []).length}枚のスライドを生成しました`);
+
+    const openBtn = document.getElementById('openBtn');
+    openBtn.href = data.url;
+    openBtn.style.display = 'inline-flex';
+
+  } catch (err) {
+    clearInterval(ticker);
+    setLoading(false);
+    setStatus('error', 'エラーが発生しました');
+    showError(err.message);
+    document.getElementById('emptyState').style.display = 'flex';
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
